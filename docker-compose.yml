@@ -1,0 +1,15 @@
+services:
+  rct-sentence-score:
+    image: rct-docker-registry.cn-zhangjiakou.cr.aliyuncs.com/algorithm/rct-sentence-score:v0
+    volumes:
+      - /data/cll/rct-sentence-score:/rct-sentence-score
+    ports:
+      - 8074:8074
+    container_name: sentence-score
+    command: python3 app.py --model_path ./models/3580000
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - capabilities:
+              - gpu
