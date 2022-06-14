@@ -6,7 +6,7 @@ services:
     ports:
       - 8074:8074
     container_name: sentence-score
-    command: python3 app.py --model_path ./models/3580000
+    command: python3 app.py --model_path ./models/3580000 --model_type qa_match --port 8074
     deploy:
       resources:
         reservations:

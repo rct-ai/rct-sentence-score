@@ -6,8 +6,7 @@
 import torch.cuda
 import waitress
 from sentence_transformers.util import cos_sim, dot_score
-
-from encoder import get_model
+from encoder import get_model, get_cross_model
 from logger import get_logger
 from flask import Flask, request, jsonify
 from flask_cors import CORS
@@ -65,17 +64,49 @@ def dot_scores():
     LOGGER.info(result)
     return jsonify(result_format(result))
 
+@app.route('/ranking/cross_score', methods=['POST'])
+def cross_score():
+    params = request.get_json()
+    LOGGER.info(f'params: {params}')
+    texts = params.get('texts', [])
+    if not texts:
+        return jsonify([{"query": "", "answer": "", "score": 0.0}])
+
+    result = []
+    text1 = texts[0]
+    text_pairs = []
+    for text in texts[1:]:
+        text_pairs.append([text1, text])
+    scores = cross_model.predict(text_pairs, apply_softmax=True)
+    for i, pairs in enumerate(text_pairs):
+        if scores[i][0] > scores[i][1]:
+            score = 1-scores[i][0]
+        else:
+            score = scores[i][1]
+        result.append({"query": pairs[0], "answer": pairs[1], "score": float("%.4f" % score)})
+        # result.append({"query": pairs[0], "answer": pairs[1], "score": float("%.4f" % scores[i])})
+    LOGGER.info(result)
+    return jsonify(result_format(result))
+
 
 CORS(app, supports_credentials=True)
+
 
 if __name__ == '__main__':
     parser = ArgumentParser()
     parser.add_argument('--model_path', type=str, required=True, help='The model path!')
-    parser.add_argument('--port', type=int, default=8074, help='server port')
-    parser.add_argument('--threads', type=int, default=20, help='The model path!')
+    parser.add_argument('--model_type', type=str, required=True, help='The model type!')
+    parser.add_argument('--port', type=int, default=8081, help='server port')
+    parser.add_argument('--threads', type=int, default=21, help='The model path!')
     args = parser.parse_args()
     device = 'cuda' if torch.cuda.is_available() else 'cpu'
     LOGGER.info('device: %s', device)
-    qa_model = get_model(args.model_path, device=device)
+    if args.model_type == 'cross':
+        cross_model = get_cross_model(args.model_path, device=device)
+    elif args.model_type == 'qa_match':
+        qa_model = get_model(args.model_path, device=device)
+    else:
+        print('please offer a model type.')
+
     # app.run('0.0.0.0', port=8074)
     waitress.serve(app, host='0.0.0.0', port=args.port, threads=args.threads, url_scheme='http')
